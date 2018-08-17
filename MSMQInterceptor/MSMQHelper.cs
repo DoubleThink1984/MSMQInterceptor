@@ -12,9 +12,10 @@ namespace MSMQInterceptor
 {
     public static class MSMQHelper
     {
-        static readonly string path = @"C:\Users\devin.PSC\Documents\TestMessageXml\";
+        static readonly string folderPath = @"C:\Users\devin.PSC\Documents\TestMessageXml\";
+        static readonly string queuePath = @"dell47\private$\test2";
 
-        public static void ProcessMessageQueue(string queuePath)
+        public static void ProcessMessageQueue()
         {
             using (MessageQueue msgQ = new MessageQueue(queuePath))
             {
@@ -30,9 +31,25 @@ namespace MSMQInterceptor
             }                        
         }
 
+        public static void ProcessMessageQueue(string queuePath)
+        {
+            using (MessageQueue msgQ = new MessageQueue(queuePath))
+            {
+                if (msgQ != null)
+                {
+                    Message[] messages = msgQ.GetAllMessages();
+
+                    foreach (var message in messages)
+                    {
+                        ProcessMessage(message);
+                    }
+                }
+            }
+        }
+
         public static void ProcessMessage(Message message)
         {
-            var fileName = path + message.LookupId.ToString() + ".xml";
+            var fileName = folderPath + message.LookupId.ToString() + ".xml";
             var doc = GetXmlDocFromMsg(message);
             doc.Save(fileName);
         }
@@ -48,7 +65,7 @@ namespace MSMQInterceptor
                     var msgBody = sw.ReadToEnd();
                     if (!string.IsNullOrWhiteSpace(msgBody))
                     {
-                        doc = GetXmlDocFromString(msgBody);
+                        doc.LoadXml(msgBody);
                     }
                 }
                 catch (Exception e)

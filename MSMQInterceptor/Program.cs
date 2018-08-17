@@ -11,38 +11,121 @@ namespace MSMQInterceptor
 {
     class Program
     {
-        static readonly string quePath = @"dell47\private$\testqueue";
+        static readonly string queuePath = @"dell47\private$\test2";
 
         static void Main(string[] args)
         {
-            SendMessages();
-            MSMQHelper.ProcessMessageQueue(quePath);
+            DirectoryWatcher.Run();
         }
 
-        static void SendMessages()
-        {            
+        public static void SendMessages(string filePath)
+        {
+            try
+            {
+                bool isFinishedTransfering = false;
+                while (!isFinishedTransfering)
+                {
+                    isFinishedTransfering = IsFileTransferComplete(filePath);
+                }
+
+                string fileName = Path.GetFileNameWithoutExtension(filePath);
+                var msg = new Message()
+                {
+                    Formatter = new XmlMessageFormatter(new String[] { "System.String,mscorlib" }),
+                    Label = fileName
+                };
+
+                if (FileExceedsMaxSize(filePath))
+                {
+                    msg.Body = filePath;
+                    //msg.Extension = Encoding.ASCII.GetBytes("FileExceedsLimit");
+                }
+                else
+                {
+                    XmlDocument xmlDoc = new XmlDocument();
+                    xmlDoc.Load(filePath);
+                    msg.Body = xmlDoc;
+                }
+
+                //MessageQueue messageQueue = GetQueue(queuePath);
+
+
+                using (MessageQueue messageQueue = GetQueue("Queue_TEST"))
+                {
+                    //messageQueue.SetPermissions("Everyone", MessageQueueAccessRights.FullControl);
+                    // Send Message to queue
+                    messageQueue.Send(msg);
+                }
+            }
+            catch (Exception e)
+            {
+                //MsmqHelper.LogError(e);
+                //throw;
+            }
+        }
+
+        private static MessageQueue GetQueue(string queueName)
+        {
             MessageQueue messageQueue = null;
-            XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.Load(Directory.GetCurrentDirectory() + @"\XMLFiles\TestFile.xml");
-            if (MessageQueue.Exists(quePath))
+            //string fullQueueName = ConfigHelper.GetAppSettingOrEmptyString(queueName).ToFullMsmqQueuePath();
+            try
             {
-                messageQueue = new MessageQueue(quePath);
-                messageQueue.Label = "Testing Queue";
+                if (MessageQueue.Exists(queuePath))
+                {
+                    messageQueue = new MessageQueue(queuePath);
+                    messageQueue.Label = "Testing Queue";
+                }
+                else
+                {
+                    // Create the Queue
+                    MessageQueue.Create(queuePath);
+                    messageQueue = new MessageQueue(queuePath);
+                    messageQueue.Label = "Newly Created Queue";
+                }
             }
-            else
+            catch (Exception e)
             {
-                // Create the Queue
-                MessageQueue.Create(quePath);
-                messageQueue = new MessageQueue(quePath);
-                messageQueue.Label = "Newly Created Queue";
+                //MsmqHelper.LogError(e);
             }
-            System.Messaging.Message msg = new System.Messaging.Message
-            {
-                Body = xmlDoc,
-                Formatter = new XmlMessageFormatter(new String[] { "System.String,mscorlib" })
-            };
-
-            messageQueue.Send(msg);
+            return messageQueue;
         }
+
+        private static bool IsFileTransferComplete(string filePath)
+        {
+            try
+            {
+                // check file length 
+                var initialLength = new System.IO.FileInfo(filePath).Length;
+                // Wait 1 second
+                System.Threading.Thread.Sleep(1000);
+                // check current length of file. If initialLength and second length are equal, file is finished transfereing
+                var secondLengthMeasurement = new System.IO.FileInfo(filePath).Length;
+
+                return initialLength == secondLengthMeasurement;
+            }
+            catch (Exception e)
+            {
+                //MsmqHelper.LogError(e);
+                return true;
+            }
+        }
+
+        private static bool FileExceedsMaxSize(string filePath)
+        {
+            decimal maxFileSize = Decimal.Multiply(4.8m, Decimal.Multiply(1024, 1024));
+
+            try
+            {
+                var fileLength = new System.IO.FileInfo(filePath).Length;
+
+                return fileLength > maxFileSize;
+            }
+            catch (Exception e)
+            {
+                //MsmqHelper.LogError(e);
+                return true;
+            }
+        }
+
     }
 }
