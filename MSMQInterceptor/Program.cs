@@ -37,7 +37,12 @@ namespace MSMQInterceptor
 
                 if (FileExceedsMaxSize(filePath))
                 {
-                    msg.Body = filePath;
+                    XmlDocument doc = new XmlDocument();
+                    XmlElement el = (XmlElement)doc.AppendChild(doc.CreateElement("LargeFile"));
+                    el.InnerText = filePath;
+                    //Console.WriteLine(doc.OuterXml);
+                    msg.Body = doc;
+                    //msg.Body = filePath;
                     //msg.Extension = Encoding.ASCII.GetBytes("FileExceedsLimit");
                 }
                 else
