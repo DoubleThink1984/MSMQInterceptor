@@ -35,25 +35,7 @@ namespace MSMQInterceptor
                     Label = fileName
                 };
 
-                if (FileExceedsMaxSize(filePath))
-                {
-                    XmlDocument doc = new XmlDocument();
-                    XmlElement el = (XmlElement)doc.AppendChild(doc.CreateElement("LargeFile"));
-                    el.InnerText = filePath;
-                    //Console.WriteLine(doc.OuterXml);
-                    msg.Body = doc;
-                    //msg.Body = filePath;
-                    //msg.Extension = Encoding.ASCII.GetBytes("FileExceedsLimit");
-                }
-                else
-                {
-                    XmlDocument xmlDoc = new XmlDocument();
-                    xmlDoc.Load(filePath);
-                    msg.Body = xmlDoc;
-                }
-
-                //MessageQueue messageQueue = GetQueue(queuePath);
-
+                msg.PackageMessageBody(filePath);
 
                 using (MessageQueue messageQueue = GetQueue("Queue_TEST"))
                 {
@@ -117,7 +99,7 @@ namespace MSMQInterceptor
 
         private static bool FileExceedsMaxSize(string filePath)
         {
-            decimal maxFileSize = Decimal.Multiply(4.8m, Decimal.Multiply(1024, 1024));
+            decimal maxFileSize = Decimal.Multiply(3.8m, Decimal.Multiply(1024, 1024));
 
             try
             {
@@ -131,6 +113,5 @@ namespace MSMQInterceptor
                 return true;
             }
         }
-
     }
 }
