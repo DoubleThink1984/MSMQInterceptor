@@ -55,20 +55,13 @@ namespace MSMQInterceptor
             //var doc = GetXmlDocFromMsg(message);
             XmlDocument doc = (XmlDocument)message.Body;
 
-            //XmlNodeList x = doc.GetElementsByTagName("LargeFile");
-            //if (x != null)
-            //{
-            //    filePath = x[0].InnerText;
-            //    File.Copy(filePath, fileName);
-            //}
-
             doc.Save(fileName);
         }
                 
         private static XmlDocument GetXmlDocFromMsg(Message message)
         {
             XmlDocument doc = new XmlDocument();
-            message.Formatter = new ActiveXMessageFormatter();
+            //message.Formatter = new ActiveXMessageFormatter();
             using (var sw = new StreamReader(message.BodyStream))
             {
                 try
@@ -98,26 +91,53 @@ namespace MSMQInterceptor
         {            
             try
             {
-                string tmpUri = @"C:\Users\devin.PSC\Documents\TmpDirectory\" + message.Label + ".xml";
+                string tmpUri = @"C:\Users\devin.PSC\Documents\TmpDirectory\";
+                string fileName = message.Label + ".xml";
 
                 // check if msg body is too large
                 if (FileExceedsMaxSize(filePath))
                 {
+                    // Set body xml with link to temporary file location
                     message.Body = GetTempPathBody(tmpUri);
-                    File.Copy(filePath, tmpUri);
+                    // Save file to temp directory
+                    if (File.Exists(filePath))
+                    {
+                        EnsureDirectoryExists(tmpUri);
+                        File.Copy(filePath + fileName, tmpUri);
+                    }
                 }
                 else
                 {
+                    // If file is not too large, set it as the message body.
                     XmlDocument xmlDoc = new XmlDocument();
                     xmlDoc.Load(filePath);
                     message.Body = xmlDoc;
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-
-                throw new Exception(e.Message);
+                throw;
             }
+        }
+
+
+        /// <summary>
+        /// Checks if given directory exists. If not, creates directory
+        /// </summary>
+        /// <param name="path">Path of directory</param>
+        private static void EnsureDirectoryExists(string path)
+        {
+            try
+            {
+                if (!Directory.Exists(path))
+                {
+                    Directory.CreateDirectory(path);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }            
         }
 
         //public static void PackageMessageBody(this Message message, string docPath)
@@ -159,30 +179,38 @@ namespace MSMQInterceptor
 
         public static void UnpackageMessageBody(this Message message)
         {
-            var doc = GetXmlDocFromMsg(message);
-            string filePath;
-            XmlNodeList x = doc.GetElementsByTagName("LargeFile");
-            if (x.Count > 0)
+            try
             {
-                filePath = x[0].InnerText;
-                XmlDocument xmlDoc = new XmlDocument();
-                xmlDoc.Load(filePath);
-                message.Body = xmlDoc;
+                var doc = GetXmlDocFromMsg(message);
+
+                XmlNodeList x = doc.GetElementsByTagName("LargeFileURI");
+                if (x.Count > 0)
+                {
+                    string filePath = x[0].InnerText;
+                    XmlDocument xmlDoc = new XmlDocument();
+                    xmlDoc.Load(filePath);
+                    message.Body = xmlDoc;
+                }
+                else
+                {
+                    message.Body = doc;
+                }
             }
-            else
+            catch (Exception)
             {
-                message.Body = doc;
+                throw;
             }
         }
 
         private static XmlDocument GetTempPathBody(string docPath)
         {
             XmlDocument doc = new XmlDocument();
-            XmlElement elememnt = (XmlElement)doc.AppendChild(doc.CreateElement("LargeFile"));
+            XmlElement elememnt = (XmlElement)doc.AppendChild(doc.CreateElement("LargeFileURI"));
             elememnt.InnerText = docPath;
 
             return doc;
         }
+
 
         private static bool FileExceedsMaxSize(string filePath)
         {
@@ -203,14 +231,14 @@ namespace MSMQInterceptor
         {   
             try
             {
-                var dcmLength = Convert.ToDecimal(length);
                 decimal maxFileSize = Decimal.Multiply(3.8m, Decimal.Multiply(1024, 1024));
+                var dcmLength = Convert.ToDecimal(length);
                 return dcmLength > maxFileSize;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 //MsmqHelper.LogError(e);
-                return true;
+                throw;
             }
         }
     }
