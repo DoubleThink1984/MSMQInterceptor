@@ -29,13 +29,16 @@ namespace MSMQInterceptor
                 }
 
                 string fileName = Path.GetFileNameWithoutExtension(filePath);
+                XmlDocument xmlDoc= new XmlDocument();
+                xmlDoc.Load(filePath);
                 var msg = new Message()
                 {
                     Formatter = new XmlMessageFormatter(new String[] { "System.String,mscorlib" }),
-                    Label = fileName
+                    Label = fileName,
+                    Body = xmlDoc
                 };
-
-                msg.PackageMessageBody(filePath);
+                //msg.Body = File.WriteAllText(filePath)
+                msg.PackageMessageBody();
 
                 using (MessageQueue messageQueue = GetQueue("Queue_TEST"))
                 {

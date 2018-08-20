@@ -87,23 +87,87 @@ namespace MSMQInterceptor
             return doc;
         }
 
-        public static void PackageMessageBody(this Message message, string filePath)
-        {            
+        public static void PackageMessageBody(this Message message)
+        {
             try
             {
                 string tmpUri = @"C:\Users\devin.PSC\Documents\TmpDirectory\";
+                string fileName = message.Label + ".xml";
+                // write message body to stream to measure size
+                // check if msg body is too large
+                XmlDocument xmlDoc = (XmlDocument)message.Body;
+                using (var stream = new MemoryStream())
+                {
+                    var writer = new XmlTextWriter(stream, Encoding.UTF8);
+                    xmlDoc.WriteTo(writer);
+                    var length = writer.BaseStream.Length;
+                    if (FileExceedsMaxSize(length))
+                    {
+                        // Set body xml with link to temporary file location
+                        message.Body = GetTempPathBody(tmpUri + fileName);
+                        // Save file to temp directory
+                        EnsureDirectoryExists(tmpUri);
+
+                        xmlDoc.Save(writer);
+                        //xmlDoc.Save(tmpUri + fileName);
+                    }
+                }                
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+        }
+
+        //public static void PackageMessageBody(this Message message, string filePath)
+        //{            
+        //    try
+        //    {
+        //        string tmpUri = @"C:\Users\devin.PSC\Documents\TmpDirectory\";
+        //        string fileName = message.Label + ".xml";
+
+        //        // check if msg body is too large
+        //        if (FileExceedsMaxSize(filePath))
+        //        {
+        //            // Set body xml with link to temporary file location
+        //            message.Body = GetTempPathBody(tmpUri + fileName);
+        //            // Save file to temp directory
+        //            if (File.Exists(filePath))
+        //            {
+        //                EnsureDirectoryExists(tmpUri);
+        //                File.Copy(filePath, tmpUri + fileName);
+        //            }
+        //        }
+        //        else
+        //        {
+        //            // If file is not too large, set it as the message body.
+        //            XmlDocument xmlDoc = new XmlDocument();
+        //            xmlDoc.Load(filePath);
+        //            message.Body = xmlDoc;
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        throw;
+        //    }
+        //}
+
+        public static void PackageMessageBody(this Message message, string filePath, string tempUri)
+        {
+            try
+            {
                 string fileName = message.Label + ".xml";
 
                 // check if msg body is too large
                 if (FileExceedsMaxSize(filePath))
                 {
                     // Set body xml with link to temporary file location
-                    message.Body = GetTempPathBody(tmpUri);
-                    // Save file to temp directory
+                    message.Body = GetTempPathBody(tempUri + fileName);
+                    // Save file to temp directory+
                     if (File.Exists(filePath))
                     {
-                        EnsureDirectoryExists(tmpUri);
-                        File.Copy(filePath + fileName, tmpUri);
+                        EnsureDirectoryExists(tempUri);
+                        File.Copy(filePath, tempUri);
                     }
                 }
                 else
@@ -119,7 +183,6 @@ namespace MSMQInterceptor
                 throw;
             }
         }
-
 
         /// <summary>
         /// Checks if given directory exists. If not, creates directory
@@ -187,16 +250,19 @@ namespace MSMQInterceptor
                 if (x.Count > 0)
                 {
                     string filePath = x[0].InnerText;
-                    XmlDocument xmlDoc = new XmlDocument();
-                    xmlDoc.Load(filePath);
-                    message.Body = xmlDoc;
+                    if (!string.IsNullOrEmpty(filePath))
+                    {
+                        XmlDocument xmlDoc = new XmlDocument();
+                        xmlDoc.Load(filePath);
+                        message.Body = xmlDoc;
+                    }                    
                 }
                 else
                 {
                     message.Body = doc;
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 throw;
             }
@@ -216,15 +282,19 @@ namespace MSMQInterceptor
         {
             try
             {
-                var docLength = new System.IO.FileInfo(filePath).Length;
+                long  docLength = 0;
                 decimal maxFileSize = Decimal.Multiply(3.8m, Decimal.Multiply(1024, 1024));
+                if (File.Exists(filePath))
+                {
+                    docLength = new System.IO.FileInfo(filePath).Length;                    
+                }                
                 return docLength > maxFileSize;
             }
             catch (Exception e)
             {
                 //MsmqHelper.LogError(e);
-                return true;
-            }
+                throw;
+            }            
         }
 
         private static bool FileExceedsMaxSize(long length)
